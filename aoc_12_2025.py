@@ -1,6 +1,7 @@
 from __future__ import annotations
 import sys
 import numpy as np
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from typing import Dict, Tuple, List, Optional
 
@@ -355,6 +356,12 @@ class RegionSpec:
 
             return shapes_dict, regions
 
+def _solve_region(args):
+    '''Worker function for parallel region solving.'''
+    region, shapes_dict = args
+    filled = region.fill_region(shapes_dict)
+    return (region, filled)
+
 __is_verbose__ = False
 
 def _printv(*args, **kwargs):
@@ -374,9 +381,12 @@ def main():
     _printv(f"Loaded {len(shapes_dict)} shapes and {len(regions)} regions")
 
     success_count = 0
-    for i, region in enumerate(regions):
+    with ProcessPoolExecutor() as executor:
+        results = list(executor.map(_solve_region,
+            [(region, shapes_dict) for region in regions]))
+
+    for i, (region, filled_region) in enumerate(results):
         _printv(f"Region {i+1}/{len(regions)}: {region.width}x{region.length}...", end=' ')
-        filled_region = region.fill_region(shapes_dict)
         if filled_region:
             success_count += 1
             _printv()
